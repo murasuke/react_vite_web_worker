@@ -1,4 +1,4 @@
-# React（Vite環境）でWeb Workerを導入する
+# React（Vite環境）でWeb Workerを導入する手順
 
 ## はじめに
 create-react-appでは、Web Workerを導入するのが困難(※1)でした。
