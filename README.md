@@ -195,5 +195,3 @@ $ git push
 数分待ってから`https://murasuke.github.io/react_vite_web_worker/`へアクセスすると、GitHub Pagesで公開されたことが確認できる
 
 
-## 参考サイト
-
