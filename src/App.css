@@ -4,3 +4,24 @@
   padding: 2rem;
   text-align: center;
 }
+
+@keyframes return {
+  50% {
+    left: 200px;
+  }
+  100% {
+    left: 0px;
+  }
+}
+
+.return {
+  width:  320px;
+  position: relative;
+  left: 0px;
+  top: 0;
+
+  animation-name: return;
+  animation-duration: 3s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease;
+}

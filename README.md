@@ -20,6 +20,8 @@ Web Workerの読み込みをサポートしているので、簡単に実現で�
 ### [サンプルプログラム](https://murasuke.github.io/react_vite_web_worker/)
   ![img10](./img/img10.png)
 
+※「実行結果は・・・」はCSSアニメーションで左右に動いています。時間がかかる処理をWeb Workerで実行した場合、画面はブロックされません。
+
 
 作成したソースはこちら
 https://github.com/murasuke/react_vite_web_worker
@@ -39,18 +41,46 @@ $ cd react_vite_web_worker
 $ code .
 ```
 
-### Web Workerを作成
+### 時間がかかるテスト関数を作成
+
+そのまま実行すると、メインスレッド(画面の再描画)をブロックする関数を作成します
+
+```typescript:./src/blockingFunc.ts
+/**
+ * 時間がかかる処理(iterations:300で2秒前後)
+ * @param iterations
+ * @returns random()の合計
+ */
+export const blockingFunc = (iterations: number): number => {
+  console.log(`\titerations: ${iterations} * 1,000,000 loop`);
+
+  let result = 0;
+  for (let i = 0; i < iterations; i++) {
+    for (let j = 0; j < 1_000_000; j++) {
+      result += Math.random();
+    }
+  }
+  console.log(`\tresult:${result}`);
+  // randomの合計を返す
+  return result;
+};
+```
+
+
+
+
+### Web Workerから呼び出す
 
 * Web Workerでイベントを受信後、2秒したら完了を返すテスト処理
 
 ```typescript:./src/worker.ts
+import { blockingFunc } from './blockingFunc';
+
 self.addEventListener('message', (e) => {
-  console.log('Web Workerで受信');
-  console.log(e);
-  setTimeout(() => {
-    // 2秒後に処理終了
-    self.postMessage('Web Workerで処理完了');
-  }, 2000);
+  const iterations = Number.parseInt(String(e.data));
+  // 時間がかかる処理
+  const result = blockingFunc(iterations);
+  return result;
 });
 
 export default {};
@@ -61,21 +91,20 @@ export default {};
 
 * Reactコンポーネントの`useEffect()`でWeb Workerを読み込む
 * ボタンクリックでWeb Workerの処理を呼び出す
-* Web Workerの処理終了後、`onmessage`イベントで結果を受け取る
+*
 
 ```typescript:./src/database.ts
 import { useEffect, useRef } from 'react';
+import Worker from './worker?worker'; // ?workerをつける
+import { blockingFunc } from './blockingFunc';
 import './App.css';
 
 function App() {
+  const roopCount = 300;
   const workerRef = useRef<Worker | null>(null);
   useEffect(() => {
-    // workerを読み込む
-    workerRef.current = new Worker(new URL('./worker', import.meta.url), {
-      type: 'module',
-    });
+    workerRef.current = new Worker(); // worker読み込み
 
-    // 処理結果を受信する
     workerRef.current.onmessage = (event) => {
       const data = event.data;
       console.log('メインスレッドで受信:', data);
@@ -86,43 +115,66 @@ function App() {
     };
   }, []);
 
-  // Web Workerに処理を依頼する
-  const handleClick = () => {
+  const handleClickWorker = () => {
     if (workerRef.current) {
-      console.log('メインスレッドで送信');
-      workerRef.current.postMessage('開始');
+      console.log('start blockingFunc() in web worker');
+      workerRef.current.postMessage(roopCount);
+      console.log('end blockingFunc() in web worker');
+    }
+  };
+
+  const handleClickSync = async () => {
+    if (workerRef.current) {
+      console.log('start blockingFunc()');
+      const result = blockingFunc(roopCount);
+      console.log(`end blockingFunc(): ${result}`);
     }
   };
 
   return (
     <div>
-      <button id="exec" onClick={() => handleClick()}>
-        Web Workerで処理実行
+      <button onClick={() => handleClickWorker()}>
+        時間がかかる関数をWebWorkerで非同期的に実行
       </button>
-      <p>実行結果はDevToolsのConsoleに出力されます。</p>
+      <br />
+      <button onClick={() => handleClickSync()}>
+        時間がかかる関数を同期的に実行
+      </button>
+      <div className="return">実行結果はDevToolsのConsoleに出力されます。</div>
     </div>
   );
 }
 
 export default App;
-
 ```
 
-* 下記のように読み込むこともできるようです
+### CSSにアニメーション効果を追加
 
-[スクリプトを Worker としてインポートする](https://ja.vitejs.dev/guide/assets.html#%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%95%E3%82%9A%E3%83%88%E3%82%92-worker-%E3%81%A8%E3%81%97%E3%81%A6%E3%82%A4%E3%83%B3%E3%83%9B%E3%82%9A%E3%83%BC%E3%83%88%E3%81%99%E3%82%8B)
+画面描画がブロックされていることがわかるように、「実行結果は・・・」を左右にアニメーションさせる。
 
-```typescript:
-import { useEffect, useRef } from 'react';
-import Worker from './worker?worker'; // ?workerをつける
-import './App.css';
 
-function App() {
-  const workerRef = useRef<Worker | null>(null);
-  useEffect(() => {
-    // workerを読み込む
-    workerRef.current = new Worker();
-    // ～～ 以下省略 ～～
+```css:./src/App.css
+@keyframes return {
+  50% {
+    left: 200px;
+  }
+  100% {
+    left: 0px;
+  }
+}
+
+.return {
+  width:  320px;
+  position: relative;
+  left: 0px;
+  top: 0;
+
+  animation-name: return;
+  animation-duration: 3s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease;
+}
+
 ```
 
 ## 動作確認
@@ -145,6 +197,8 @@ $ npm run dev
 
   ![img20](./img/img20.png)
 
+* `Web Worker`で実行した場合は、画面のアニメーションが動き続けます
+* `同期的`に実行した場合、計算が終わるでアニメーションが固まります
 
 
 ## おまけ GitHub Pagesにデプロイ

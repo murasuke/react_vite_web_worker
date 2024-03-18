@@ -1,10 +1,10 @@
+import { blockingFunc } from './blockingFunc';
+
 self.addEventListener('message', (e) => {
-  console.log('Web Workerで受信');
-  console.log(e);
-  setTimeout(() => {
-    // 2秒後に処理終了
-    self.postMessage('Web Workerで処理完了');
-  }, 2000);
+  const iterations = Number.parseInt(String(e.data));
+  // 時間がかかる処理
+  const result = blockingFunc(iterations);
+  return result;
 });
 
 export default {};
